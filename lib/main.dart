@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_admob/firebase_admob.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -8,12 +10,13 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter/services.dart' show DeviceOrientation, SystemChrome;
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+  await Firebase.initializeApp();
   runApp(WhichPhotoApp());
 }
 
@@ -63,6 +66,12 @@ class _WhichPhotoHomePageState extends State<WhichPhotoHomePage> {
   final String CLIENT_ID = "N3bGCse4SMQS9yv5MUrWTvBk";
   final String CLIENT_SECRET = "JmjoZmThkhA4JRrxrgxFwTd7L8R0Z9Hg8Mru7PAhn4Ltyai0";
 
+  static const MobileAdTargetingInfo targetingInfo = MobileAdTargetingInfo(
+    testDevices: null,
+    keywords: <String>['photo', 'filter', 'film', 'Instagram'],
+    childDirected: true,
+    nonPersonalizedAds: true,
+  );
 
   Future getImage1() async {
     final pickedFile = await picker.getImage(source: ImageSource.gallery);
@@ -89,79 +98,90 @@ class _WhichPhotoHomePageState extends State<WhichPhotoHomePage> {
   }
 
   Future<void> _buttonPressed() async {
-    if (_state == 0){
 
-      setState(() {
-        _state = 1;
-      });
+    if (_image1 != null && _image2 != null) {
+      if (_state == 0) {
+        setState(() {
+          _state = 1;
+        });
 
 
-      var postUri = Uri.parse("https://api.everypixel.com/v1/quality_ugc");
-      var request = new http.MultipartRequest("POST", postUri);
+        var postUri = Uri.parse("https://api.everypixel.com/v1/quality_ugc");
+        var request = new http.MultipartRequest("POST", postUri);
 
-      var authn = 'Basic ' + base64Encode(utf8.encode('$CLIENT_ID:$CLIENT_SECRET'));
+        var authn = 'Basic ' +
+            base64Encode(utf8.encode('$CLIENT_ID:$CLIENT_SECRET'));
 
-      Map<String, String> headers = { 'Authorization' : authn};
+        Map<String, String> headers = { 'Authorization': authn};
 
-      request.headers.addAll(headers);
-      request.files.add(await http.MultipartFile.fromPath('data', _image1.path));
-
-      print(request.files);
-
-      request.send().then((response) async {
-       print(response.statusCode);
-
-       response.stream.transform(utf8.decoder).listen((value) {
-         img1Response = value;
-         print(value);
-       });
-
-       var postUri = Uri.parse("https://api.everypixel.com/v1/quality_ugc");
-       var request = new http.MultipartRequest("POST", postUri);
-
-       var authn = 'Basic ' + base64Encode(utf8.encode('$CLIENT_ID:$CLIENT_SECRET'));
-
-       Map<String, String> headers = { 'Authorization' : authn};
-
-       request.headers.addAll(headers);
-       request.files.add(await http.MultipartFile.fromPath('data', _image2.path));
+        request.headers.addAll(headers);
+        request.files.add(
+            await http.MultipartFile.fromPath('data', _image1.path));
 
         print(request.files);
 
-        request.send().then((response) {
-        print(response.statusCode);
+        request.send().then((response) async {
+          print(response.statusCode);
 
-        response.stream.transform(utf8.decoder).listen((value) {
-          img2Response = value;
-          print(value);
 
-          firstBetter = double.parse(img1Response.split('score":')[1].split("}")[0]) >
-              double.parse(img2Response.split('score":')[1].split("}")[0]);
+          response.stream.transform(utf8.decoder).listen((value) {
+            img1Response = value;
+            print(value);
+          });
 
-          percentBetter = (double.parse(img1Response.split('score":')[1].split("}")[0]) * 100
-              - double.parse(img2Response.split('score":')[1].split("}")[0]) * 100).abs().floor();
+          var postUri = Uri.parse("https://api.everypixel.com/v1/quality_ugc");
+          var request = new http.MultipartRequest("POST", postUri);
 
-          setState(() {
-            _state = 2;
+          var authn = 'Basic ' +
+              base64Encode(utf8.encode('$CLIENT_ID:$CLIENT_SECRET'));
+
+          Map<String, String> headers = { 'Authorization': authn};
+
+          request.headers.addAll(headers);
+          request.files.add(
+              await http.MultipartFile.fromPath('data', _image2.path));
+
+          print(request.files);
+
+          request.send().then((response) {
+            print(response.statusCode);
+
+            response.stream.transform(utf8.decoder).listen((value) {
+              img2Response = value;
+              print(value);
+
+              firstBetter =
+                  double.parse(img1Response.split('score":')[1].split("}")[0]) >
+                      double.parse(
+                          img2Response.split('score":')[1].split("}")[0]);
+
+              percentBetter =
+                  (double.parse(
+                      img1Response.split('score":')[1].split("}")[0]) *
+                      100
+                      - double.parse(
+                          img2Response.split('score":')[1].split("}")[0]) * 100)
+                      .abs()
+                      .floor();
+
+              setState(() {
+                _state = 2;
+                _interstitialAd.show();
+              });
+            });
           });
         });
+      }
+      else if (_state == 2) {
+        setState(() {
+          _image1 = null;
+          _image2 = null;
+          img1Response = "";
+          img2Response = "";
+          _state = 0;
         });
-
-
-      });
-
-
+      }
     }
-    else if (_state  == 2) {
-      setState(() {
-        _image1 = null;
-        _image2 = null;
-        img1Response = "";
-        img2Response = "";
-        _state = 0;
-      });
-    }
-
   }
 
   var spinkit = SpinKitFadingCircle(
@@ -169,6 +189,31 @@ class _WhichPhotoHomePageState extends State<WhichPhotoHomePage> {
     size: 20.0,
   );
 
+  InterstitialAd createInterstitialAd() {
+    return InterstitialAd(
+      adUnitId: "ca-app-pub-4663509279582633/8983594105",
+      targetingInfo: targetingInfo,
+      listener: (MobileAdEvent event) {
+        print("InterstitialAd event $event");
+      },
+    );
+  }
+
+  InterstitialAd _interstitialAd;
+
+  @override
+  void initState() {
+    super.initState();
+    FirebaseAdMob.instance.initialize(appId: "ca-app-pub-4663509279582633~6551520814");
+    _interstitialAd = createInterstitialAd()
+      ..load();
+  }
+
+  @override
+  void dispose() {
+    _interstitialAd?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

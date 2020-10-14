@@ -31,10 +31,21 @@ dependencies:
   image_picker: ^0.6.7+11
   flutter_spinkit: "^4.1.2"
   dio: ^3.0.10
+  flutter_launcher_icons: ^0.8.1
+  firebase_core: ^0.5.0+1
+  firebase_admob: ^0.10.0+2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+flutter_icons:
+  ios: true
+  android: true
+  image_path_ios: "assets/app_icon.png"
+  image_path_android: "assets/app_icon.png"
+  adaptive_icon_background: "assets/app_icon_background.png"
+  adaptive_icon_foreground: "assets/app_icon_foreground.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
